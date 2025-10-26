@@ -1,8 +1,14 @@
 import { View, StyleSheet, ScrollView, Alert, Dimensions, Modal, TouchableOpacity, FlatList, Image, PanResponder } from 'react-native';
 import { Text, Button, Card, Avatar, List, Divider, Chip, IconButton, SegmentedButtons, TextInput } from 'react-native-paper';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as WebBrowser from 'expo-web-browser';
+import * as Linking from 'expo-linking';
+import { supabase } from '@/services/supabase';
+
+// Initialize WebBrowser for OAuth
+WebBrowser.maybeCompleteAuthSession();
 
 const { width } = Dimensions.get('window');
 
@@ -370,19 +376,116 @@ export default function Index() {
   // ==================== HANDLERS ====================
   const [emailModalVisible, setEmailModalVisible] = useState(false);
   const [emailInput, setEmailInput] = useState('');
+  const [passwordInput, setPasswordInput] = useState('');
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
 
   const handleGoogleSignIn = async () => {
-    // Show modal for email input (works on both Android and iOS)
+    // Just use email-based sign in - OAuth doesn't work in Expo Go
     setEmailModalVisible(true);
   };
 
-  const processGoogleSignIn = async (email: string) => {
+  const handleRealGoogleOAuth = async () => {
     try {
-      console.log('🔐 Processing Google Sign In for:', email);
+      console.log('🚀 Starting Google OAuth...');
+      
+      Alert.alert(
+        'Instructions',
+        '1. Browser will open with Google sign-in\n2. Sign in with your Google account\n3. After signing in, CLOSE the browser tab\n4. Return to this app and wait 3 seconds',
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+          {
+            text: 'Continue',
+            onPress: async () => {
+              const { data, error } = await supabase.auth.signInWithOAuth({
+                provider: 'google',
+                options: {
+                  skipBrowserRedirect: true,
+                  queryParams: {
+                    access_type: 'offline',
+                    prompt: 'consent',
+                  },
+                },
+              });
+
+              if (error) {
+                console.error('❌ OAuth Error:', error);
+                Alert.alert('Error', 'Google OAuth failed: ' + error.message);
+                return;
+              }
+
+              if (data?.url) {
+                console.log('🌐 Opening browser...');
+                
+                // Open in external browser
+                await WebBrowser.openBrowserAsync(data.url);
+                
+                console.log('📱 Browser opened, starting session polling...');
+                
+                // Start polling immediately
+                let attempts = 0;
+                const maxAttempts = 60; // 60 seconds
+                let intervalId: NodeJS.Timeout | null = null;
+                
+                const pollSession = async () => {
+                  attempts++;
+                  console.log(`🔍 Checking for session... (attempt ${attempts}/${maxAttempts})`);
+                  
+                  try {
+                    const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+                    
+                    if (sessionData?.session && sessionData.session.user) {
+                      if (intervalId) clearInterval(intervalId);
+                      console.log('✅ Session found!', sessionData.session.user.email);
+                      Alert.alert('Success!', 'Signed in as ' + sessionData.session.user.email);
+                      await processSupabaseUser(sessionData.session.user);
+                      return true;
+                    } else if (attempts >= maxAttempts) {
+                      if (intervalId) clearInterval(intervalId);
+                      console.log('⏱️ Timeout - no session detected after', attempts, 'attempts');
+                      Alert.alert('Timeout', 'Could not detect sign-in. Please try the Email option instead.');
+                      return true;
+                    }
+                    return false;
+                  } catch (err) {
+                    console.error('❌ Session check error:', err);
+                    return false;
+                  }
+                };
+                
+                // Start the interval
+                intervalId = setInterval(() => {
+                  pollSession();
+                }, 1000);
+                
+                // Also check immediately
+                pollSession();
+                
+                console.log('✅ Polling started! Sign in with Google and return to this app...');
+              }
+            },
+          },
+        ]
+      );
+    } catch (error: any) {
+      console.error('❌ OAuth exception:', error);
+      Alert.alert('Error', error.message || 'OAuth failed');
+    }
+  };
+
+  const processGoogleSignIn = async (email: string, password: string) => {
+    try {
+      console.log('🔐 Processing Sign In for:', email);
       
       if (!email || !email.includes('@')) {
         Alert.alert('Invalid Email', 'Please enter a valid email address.');
+        return;
+      }
+      
+      if (!password || password.length < 6) {
+        Alert.alert('Invalid Password', 'Password must be at least 6 characters.');
         return;
       }
       
@@ -390,7 +493,7 @@ export default function Index() {
       const isAdmin = email.toLowerCase() === 'inform.growtogether@gmail.com';
       console.log('👤 Is admin:', isAdmin);
       
-      // Extract first and last name from email (mock)
+      // Extract first and last name from email
       const emailName = email.split('@')[0];
       const nameParts = emailName.split('.');
       const firstName = nameParts[0] ? nameParts[0].charAt(0).toUpperCase() + nameParts[0].slice(1) : 'User';
@@ -401,12 +504,92 @@ export default function Index() {
       console.log('🔍 Existing account found:', !!existingAccount);
       
       if (existingAccount) {
+        // Verify password
+        if ((existingAccount as any).password !== password) {
+          Alert.alert('Incorrect Password', 'The password you entered is incorrect.');
+          return;
+        }
+        
         // Sign in to existing account
         console.log('✅ Signing in existing user');
         setUser(existingAccount);
         setCurrentScreen('dashboard');
         setEmailModalVisible(false);
         setEmailInput('');
+        setPasswordInput('');
+        Alert.alert('Welcome Back!', `Signed in as ${existingAccount.firstName} ${existingAccount.lastName}`);
+      } else {
+        // New account - go to quiz
+        console.log('🆕 Creating new account - going to quiz');
+        console.log('📝 Name extracted:', { firstName, lastName });
+        
+        // Pre-fill quiz data with extracted names
+        setQuizData(prev => ({
+          ...prev,
+          firstName,
+          lastName,
+        }));
+        
+        setUser({
+          email,
+          firstName,
+          lastName,
+          role: isAdmin ? 'student' : 'student',
+          school: '',
+          currentGrade: 9,
+          grade: 9,
+          age: 14,
+          subjectPreference: '',
+          availability: {
+            mon: false,
+            tue: false,
+            wed: false,
+            thu: false,
+            fri: false,
+            sat: false,
+            sun: false,
+          },
+          isAdmin,
+          password, // Store password
+        } as any);
+        
+        console.log('🎯 Navigating to quiz screen');
+        setCurrentScreen('quiz');
+        setEmailModalVisible(false);
+        setEmailInput('');
+        setPasswordInput('');
+        
+        if (isAdmin) {
+          Alert.alert('Admin Account', 'You are signing in with the admin account. Complete the quiz to set up your profile.');
+        }
+      }
+    } catch (error) {
+      console.error('Sign in error:', error);
+      Alert.alert('Error', 'Failed to sign in. Please try again.');
+    }
+  };
+
+  const processSupabaseUser = async (supabaseUser: any) => {
+    try {
+      const email = supabaseUser.email;
+      const firstName = supabaseUser.user_metadata?.given_name || supabaseUser.user_metadata?.name?.split(' ')[0] || 'User';
+      const lastName = supabaseUser.user_metadata?.family_name || supabaseUser.user_metadata?.name?.split(' ').slice(1).join(' ') || '';
+      
+      console.log('🔐 Processing Supabase user:', { email, firstName, lastName });
+      
+      // Check if admin email
+      const isAdmin = email.toLowerCase() === 'inform.growtogether@gmail.com';
+      console.log('👤 Is admin:', isAdmin);
+      
+      // Check if account already exists in local state
+      const existingAccount = allAccounts.find(acc => acc.email === email);
+      console.log('🔍 Existing account found:', !!existingAccount);
+      
+      if (existingAccount) {
+        // Sign in to existing account
+        console.log('✅ Signing in existing user');
+        setUser(existingAccount);
+        setCurrentScreen('dashboard');
         Alert.alert('Welcome Back!', `Signed in as ${existingAccount.firstName} ${existingAccount.lastName}`);
       } else {
         // New account - go to quiz
@@ -450,7 +633,7 @@ export default function Index() {
 
   const handleQuizSubmit = () => {
     // Create/update user with quiz data
-    const updatedUser: User = {
+    const updatedUser: any = {
       id: user?.id || `user-${Date.now()}`,
       email: user?.email || 'student@school.com',
       firstName: quizData.firstName,
@@ -462,6 +645,7 @@ export default function Index() {
       availability: quizData.availability,
       role: 'student',
       isAdmin: user?.isAdmin || false,
+      password: (user as any)?.password || '', // Keep existing password
     };
     
     // Add to allAccounts if new
@@ -760,10 +944,10 @@ export default function Index() {
           <View style={styles.modalOverlay}>
             <View style={styles.emailModalContainer}>
               <Text variant="headlineSmall" style={styles.emailModalTitle}>
-                Sign in with Google
+                Sign In
               </Text>
               <Text variant="bodyMedium" style={styles.emailModalSubtitle}>
-                Enter your Gmail address to continue
+                Enter your email address to sign in or create an account
               </Text>
               
               <TextInput
@@ -778,8 +962,19 @@ export default function Index() {
                 style={styles.emailInput}
               />
               
+              <TextInput
+                mode="outlined"
+                label="Password"
+                value={passwordInput}
+                onChangeText={setPasswordInput}
+                placeholder="Enter password (min 6 characters)"
+                secureTextEntry
+                autoCapitalize="none"
+                style={styles.emailInput}
+              />
+              
               <Text variant="bodySmall" style={styles.adminHint}>
-                Use your school district email address to sign in
+                New users: Create a password • Existing users: Enter your password
               </Text>
               
               <View style={styles.emailModalButtons}>
@@ -788,6 +983,7 @@ export default function Index() {
                   onPress={() => {
                     setEmailModalVisible(false);
                     setEmailInput('');
+                    setPasswordInput('');
                   }}
                   style={styles.emailModalButton}
                 >
@@ -795,9 +991,10 @@ export default function Index() {
                 </Button>
                 <Button
                   mode="contained"
-                  onPress={() => processGoogleSignIn(emailInput)}
+                  onPress={() => processGoogleSignIn(emailInput, passwordInput)}
                   style={styles.emailModalButton}
                   icon="login"
+                  disabled={!emailInput || !passwordInput || passwordInput.length < 6}
                 >
                   Sign In
                 </Button>

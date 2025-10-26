@@ -4,21 +4,29 @@
     "slug": "growtogether",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "scheme": "growtogether",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
     "android": {
       "package": "com.growtogether.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "permissions": [
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "CAMERA"
+      ]
     },
     "ios": {
-      "bundleIdentifier": "com.growtogether.app"
+      "bundleIdentifier": "com.growtogether.app",
+      "supportsTablet": true
     },
-    "plugins": [
-      "expo-router"
-    ],
     "extra": {
       "eas": {
         "projectId": "f0639725-710f-49f3-a312-c378347c5dec"
