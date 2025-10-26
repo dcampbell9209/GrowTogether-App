@@ -6,13 +6,19 @@
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "scheme": "growtogether",
-    "entryPoint": "./App.tsx",
     "android": {
-      "package": "com.growtogether.app"
+      "package": "com.growtogether.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      }
     },
     "ios": {
       "bundleIdentifier": "com.growtogether.app"
     },
+    "plugins": [
+      "expo-router"
+    ],
     "extra": {
       "eas": {
         "projectId": "f0639725-710f-49f3-a312-c378347c5dec"
