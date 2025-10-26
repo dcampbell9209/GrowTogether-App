@@ -1,13 +1,9 @@
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { PaperProvider } from 'react-native-paper';
-import Index from './app/index';
+import { View, Text } from 'react-native';
 
 export default function App() {
   return (
-    <SafeAreaProvider>
-      <PaperProvider>
-        <Index />
-      </PaperProvider>
-    </SafeAreaProvider>
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <Text>GrowTogether App</Text>
+    </View>
   );
 }
