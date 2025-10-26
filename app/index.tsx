@@ -5,7 +5,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
-import { supabase } from '@/services/supabase';
+import { supabase } from '../src/services/supabase';
 
 // Initialize WebBrowser for OAuth
 WebBrowser.maybeCompleteAuthSession();
