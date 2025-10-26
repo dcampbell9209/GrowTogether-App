@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "GrowTogether",
+    "slug": "growtogether",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "scheme": "growtogether",
+    "entryPoint": "./App.tsx",
+    "android": {
+      "package": "com.growtogether.app"
+    },
+    "ios": {
+      "bundleIdentifier": "com.growtogether.app"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "f0639725-710f-49f3-a312-c378347c5dec"
+      }
+    }
+  }
+}
