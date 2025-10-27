@@ -5,6 +5,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 // import { supabase } from '../src/services/supabase'; // Commented out for build
 
 // Initialize WebBrowser for OAuth
@@ -101,6 +102,90 @@ export default function Index() {
   const [allAccounts, setAllAccounts] = useState<User[]>([]);
   const [allChats, setAllChats] = useState<any[]>([]);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Persistent storage functions
+  const saveUserSession = async (userData: any) => {
+    try {
+      await AsyncStorage.setItem('@user_session', JSON.stringify(userData));
+      console.log('✅ User session saved');
+    } catch (error) {
+      console.error('Error saving user session:', error);
+    }
+  };
+
+  const saveAllAccounts = async (accounts: User[]) => {
+    try {
+      await AsyncStorage.setItem('@all_accounts', JSON.stringify(accounts));
+      console.log('✅ All accounts saved');
+    } catch (error) {
+      console.error('Error saving accounts:', error);
+    }
+  };
+
+  const saveAllChats = async (chats: any[]) => {
+    try {
+      await AsyncStorage.setItem('@all_chats', JSON.stringify(chats));
+      console.log('✅ All chats saved');
+    } catch (error) {
+      console.error('Error saving chats:', error);
+    }
+  };
+
+  const loadStoredData = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Load user session
+      const userSession = await AsyncStorage.getItem('@user_session');
+      if (userSession) {
+        const userData = JSON.parse(userSession);
+        setUser(userData);
+        setCurrentScreen('dashboard');
+        console.log('✅ Restored user session:', userData.username);
+      }
+
+      // Load all accounts
+      const storedAccounts = await AsyncStorage.getItem('@all_accounts');
+      if (storedAccounts) {
+        const accounts = JSON.parse(storedAccounts);
+        setAllAccounts(accounts);
+        console.log('✅ Restored', accounts.length, 'accounts');
+      }
+
+      // Load all chats
+      const storedChats = await AsyncStorage.getItem('@all_chats');
+      if (storedChats) {
+        const chats = JSON.parse(storedChats);
+        setAllChats(chats);
+        console.log('✅ Restored', chats.length, 'chats');
+      }
+
+      setIsLoading(false);
+    } catch (error) {
+      console.error('Error loading stored data:', error);
+      setIsLoading(false);
+    }
+  };
+
+  // Load data on app start
+  useEffect(() => {
+    loadStoredData();
+  }, []);
+
+  // Auto-save accounts whenever they change
+  useEffect(() => {
+    if (!isLoading && allAccounts.length > 0) {
+      saveAllAccounts(allAccounts);
+    }
+  }, [allAccounts, isLoading]);
+
+  // Auto-save chats whenever they change
+  useEffect(() => {
+    if (!isLoading && allChats.length > 0) {
+      saveAllChats(allChats);
+    }
+  }, [allChats, isLoading]);
   
   // Edit profile state
   const [showEditProfile, setShowEditProfile] = useState(false);
@@ -374,14 +459,13 @@ export default function Index() {
   }
 
   // ==================== HANDLERS ====================
-  const [emailModalVisible, setEmailModalVisible] = useState(false);
-  const [emailInput, setEmailInput] = useState('');
+  const [loginModalVisible, setLoginModalVisible] = useState(false);
+  const [usernameInput, setUsernameInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
 
-  const handleGoogleSignIn = async () => {
-    // Just use email-based sign in - OAuth doesn't work in Expo Go
-    setEmailModalVisible(true);
+  const handleSignIn = async () => {
+    setLoginModalVisible(true);
   };
 
   const handleRealGoogleOAuth = async () => {
@@ -481,12 +565,12 @@ export default function Index() {
     */
   };
 
-  const processGoogleSignIn = async (email: string, password: string) => {
+  const processSignIn = async (username: string, password: string) => {
     try {
-      console.log('🔐 Processing Sign In for:', email);
+      console.log('🔐 Processing Sign In for:', username);
       
-      if (!email || !email.includes('@')) {
-        Alert.alert('Invalid Email', 'Please enter a valid email address.');
+      if (!username || username.trim().length < 3) {
+        Alert.alert('Invalid Username', 'Username must be at least 3 characters.');
         return;
       }
       
@@ -495,18 +579,12 @@ export default function Index() {
         return;
       }
       
-      // Check if admin email
-      const isAdmin = email.toLowerCase() === 'inform.growtogether@gmail.com';
+      // Check if admin username
+      const isAdmin = username.toLowerCase() === 'admin';
       console.log('👤 Is admin:', isAdmin);
       
-      // Extract first and last name from email
-      const emailName = email.split('@')[0];
-      const nameParts = emailName.split('.');
-      const firstName = nameParts[0] ? nameParts[0].charAt(0).toUpperCase() + nameParts[0].slice(1) : 'User';
-      const lastName = nameParts[1] ? nameParts[1].charAt(0).toUpperCase() + nameParts[1].slice(1) : '';
-      
       // Check if account already exists
-      const existingAccount = allAccounts.find(acc => acc.email === email);
+      const existingAccount = allAccounts.find(acc => (acc as any).username?.toLowerCase() === username.toLowerCase());
       console.log('🔍 Existing account found:', !!existingAccount);
       
       if (existingAccount) {
@@ -520,26 +598,24 @@ export default function Index() {
         console.log('✅ Signing in existing user');
         setUser(existingAccount);
         setCurrentScreen('dashboard');
-        setEmailModalVisible(false);
-        setEmailInput('');
+        setLoginModalVisible(false);
+        setUsernameInput('');
         setPasswordInput('');
+        
+        // Save to persistent storage
+        await saveUserSession(existingAccount);
+        
         Alert.alert('Welcome Back!', `Signed in as ${existingAccount.firstName} ${existingAccount.lastName}`);
       } else {
         // New account - go to quiz
         console.log('🆕 Creating new account - going to quiz');
-        console.log('📝 Name extracted:', { firstName, lastName });
-        
-        // Pre-fill quiz data with extracted names
-        setQuizData(prev => ({
-          ...prev,
-          firstName,
-          lastName,
-        }));
         
         setUser({
-          email,
-          firstName,
-          lastName,
+          id: `user-${Date.now()}`,
+          email: `${username}@growtogether.app`,
+          username,
+          firstName: '',
+          lastName: '',
           role: isAdmin ? 'student' : 'student',
           school: '',
           currentGrade: 9,
@@ -561,8 +637,8 @@ export default function Index() {
         
         console.log('🎯 Navigating to quiz screen');
         setCurrentScreen('quiz');
-        setEmailModalVisible(false);
-        setEmailInput('');
+        setLoginModalVisible(false);
+        setUsernameInput('');
         setPasswordInput('');
         
         if (isAdmin) {
@@ -641,11 +717,12 @@ export default function Index() {
     */
   };
 
-  const handleQuizSubmit = () => {
+  const handleQuizSubmit = async () => {
     // Create/update user with quiz data
     const updatedUser: any = {
       id: user?.id || `user-${Date.now()}`,
       email: user?.email || 'student@school.com',
+      username: (user as any)?.username || 'user',
       firstName: quizData.firstName,
       lastName: quizData.lastName,
       currentGrade: quizData.currentGrade,
@@ -668,6 +745,10 @@ export default function Index() {
     });
     
     setUser(updatedUser);
+    
+    // Save session
+    await saveUserSession(updatedUser);
+    
     setCurrentScreen('dashboard');
   };
 
@@ -852,7 +933,15 @@ export default function Index() {
     );
   };
 
-  const handleSignOut = () => {
+  const handleSignOut = async () => {
+    // Clear user session from storage
+    try {
+      await AsyncStorage.removeItem('@user_session');
+      console.log('✅ User session cleared');
+    } catch (error) {
+      console.error('Error clearing session:', error);
+    }
+    
     setUser(null);
     setCurrentScreen('login');
     setActiveChat(null);
@@ -927,12 +1016,12 @@ export default function Index() {
 
           <Button
             mode="contained"
-            onPress={handleGoogleSignIn}
-            icon="google"
+            onPress={handleSignIn}
+            icon="login"
             style={styles.googleButton}
             contentStyle={styles.googleButtonContent}
           >
-            Sign in with Google
+            Sign In
           </Button>
 
           <Text variant="bodySmall" style={styles.footerText}>
@@ -946,10 +1035,10 @@ export default function Index() {
 
         {/* Email Input Modal */}
         <Modal
-          visible={emailModalVisible}
+          visible={loginModalVisible}
           transparent={true}
           animationType="fade"
-          onRequestClose={() => setEmailModalVisible(false)}
+          onRequestClose={() => setLoginModalVisible(false)}
         >
           <View style={styles.modalOverlay}>
             <View style={styles.emailModalContainer}>
@@ -957,18 +1046,16 @@ export default function Index() {
                 Sign In
               </Text>
               <Text variant="bodyMedium" style={styles.emailModalSubtitle}>
-                Enter your email address to sign in or create an account
+                Enter your username to sign in or create an account
               </Text>
               
               <TextInput
                 mode="outlined"
-                label="Email Address"
-                value={emailInput}
-                onChangeText={setEmailInput}
-                placeholder="your.name@gmail.com"
-                keyboardType="email-address"
+                label="Username"
+                value={usernameInput}
+                onChangeText={setUsernameInput}
+                placeholder="your_username"
                 autoCapitalize="none"
-                autoComplete="email"
                 style={styles.emailInput}
               />
               
@@ -991,8 +1078,8 @@ export default function Index() {
                 <Button
                   mode="outlined"
                   onPress={() => {
-                    setEmailModalVisible(false);
-                    setEmailInput('');
+                    setLoginModalVisible(false);
+                    setUsernameInput('');
                     setPasswordInput('');
                   }}
                   style={styles.emailModalButton}
@@ -1001,10 +1088,10 @@ export default function Index() {
                 </Button>
                 <Button
                   mode="contained"
-                  onPress={() => processGoogleSignIn(emailInput, passwordInput)}
+                  onPress={() => processSignIn(usernameInput, passwordInput)}
                   style={styles.emailModalButton}
                   icon="login"
-                  disabled={!emailInput || !passwordInput || passwordInput.length < 6}
+                  disabled={!usernameInput || !passwordInput || passwordInput.length < 6}
                 >
                   Sign In
                 </Button>
