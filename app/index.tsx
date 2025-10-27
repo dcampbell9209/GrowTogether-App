@@ -5,7 +5,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
-import { supabase } from '../src/services/supabase';
+// import { supabase } from '../src/services/supabase'; // Commented out for build
 
 // Initialize WebBrowser for OAuth
 WebBrowser.maybeCompleteAuthSession();
@@ -385,6 +385,11 @@ export default function Index() {
   };
 
   const handleRealGoogleOAuth = async () => {
+    // OAuth disabled for production build
+    Alert.alert('OAuth Not Available', 'Please use email/password sign in.');
+    return;
+    
+    /* Commented out for build - Supabase OAuth
     try {
       console.log('🚀 Starting Google OAuth...');
       
@@ -473,6 +478,7 @@ export default function Index() {
       console.error('❌ OAuth exception:', error);
       Alert.alert('Error', error.message || 'OAuth failed');
     }
+    */
   };
 
   const processGoogleSignIn = async (email: string, password: string) => {
@@ -570,6 +576,9 @@ export default function Index() {
   };
 
   const processSupabaseUser = async (supabaseUser: any) => {
+    // Disabled for production build
+    return;
+    /*
     try {
       const email = supabaseUser.email;
       const firstName = supabaseUser.user_metadata?.given_name || supabaseUser.user_metadata?.name?.split(' ')[0] || 'User';
@@ -629,6 +638,7 @@ export default function Index() {
       console.error('Google sign in error:', error);
       Alert.alert('Error', 'Failed to sign in. Please try again.');
     }
+    */
   };
 
   const handleQuizSubmit = () => {
