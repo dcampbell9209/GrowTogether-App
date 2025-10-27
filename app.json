@@ -3,6 +3,7 @@
     "name": "GrowTogether",
     "slug": "growtogether",
     "version": "1.0.0",
+    "description": "Connect students with volunteer tutors within their school district",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "android": {
