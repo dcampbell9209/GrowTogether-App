@@ -1,0 +1,12 @@
+# EAS upload exclusions (used when requireCommit is false)
+node_modules/
+.expo/
+dist/
+web-build/
+.git/
+*.md
+!README.md
+coverage/
+.eas-tmp/
+android/
+ios/

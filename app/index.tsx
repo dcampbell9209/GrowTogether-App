@@ -6,6 +6,11 @@ import * as ImagePicker from 'expo-image-picker';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AgeGateScreen } from '../src/components/AgeGateScreen';
+import {
+  AGE_VERIFICATION_STORAGE_KEY,
+  AgeVerificationData,
+} from '../src/utils/ageVerification';
 // import { supabase } from '../src/services/supabase'; // Commented out for build
 
 // Initialize WebBrowser for OAuth
@@ -103,6 +108,8 @@ export default function Index() {
   const [allChats, setAllChats] = useState<any[]>([]);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
+  const [ageGateComplete, setAgeGateComplete] = useState(false);
+  const [isChildUser, setIsChildUser] = useState(false);
 
   // Persistent storage functions
   const saveUserSession = async (userData: any) => {
@@ -135,9 +142,21 @@ export default function Index() {
   const loadStoredData = async () => {
     try {
       setIsLoading(true);
+
+      const ageVerification = await AsyncStorage.getItem(AGE_VERIFICATION_STORAGE_KEY);
+      let hasCompletedAgeGate = false;
+
+      if (ageVerification) {
+        const ageData: AgeVerificationData = JSON.parse(ageVerification);
+        hasCompletedAgeGate = true;
+        setAgeGateComplete(true);
+        setIsChildUser(ageData.isUnder13);
+      }
       
-      // Load user session
-      const userSession = await AsyncStorage.getItem('@user_session');
+      // Load user session only after age verification
+      const userSession = hasCompletedAgeGate
+        ? await AsyncStorage.getItem('@user_session')
+        : null;
       if (userSession) {
         const userData = JSON.parse(userSession);
         setUser(userData);
@@ -215,7 +234,7 @@ export default function Index() {
     firstName: '',
     lastName: '',
     currentGrade: 9,
-    age: 14,
+    age: 0,
     school: SCHOOLS[0],
     subjectPreference: SUBJECTS[0],
     availability: {
@@ -464,6 +483,25 @@ export default function Index() {
   const [passwordInput, setPasswordInput] = useState('');
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
 
+  const handleAgeGateComplete = async (ageData: AgeVerificationData) => {
+    try {
+      await AsyncStorage.setItem(AGE_VERIFICATION_STORAGE_KEY, JSON.stringify(ageData));
+      setAgeGateComplete(true);
+      setIsChildUser(ageData.isUnder13);
+      setCurrentScreen('login');
+    } catch (error) {
+      console.error('Error saving age verification:', error);
+      Alert.alert('Error', 'Could not save your response. Please try again.');
+    }
+  };
+
+  const showChildRestrictedAlert = () => {
+    Alert.alert(
+      'Feature Unavailable',
+      'Messaging and photo sharing are not available in this mode. Ask a parent or guardian for help using GrowTogether.'
+    );
+  };
+
   const handleSignIn = async () => {
     setLoginModalVisible(true);
   };
@@ -620,7 +658,7 @@ export default function Index() {
           school: '',
           currentGrade: 9,
           grade: 9,
-          age: 14,
+          age: 0,
           subjectPreference: '',
           availability: {
             mon: false,
@@ -754,6 +792,10 @@ export default function Index() {
 
   const handleStartChat = (volunteer: any) => {
     if (!user) return;
+    if (isChildUser) {
+      showChildRestrictedAlert();
+      return;
+    }
     
     // Check if chat already exists
     const existingChat = allChats.find(chat => 
@@ -816,6 +858,11 @@ export default function Index() {
   };
 
   const handleOpenChat = (chatId: string) => {
+    if (isChildUser) {
+      showChildRestrictedAlert();
+      return;
+    }
+
     const chat = allChats.find(c => c.id === chatId);
     if (chat) {
       setActiveChat(chat);
@@ -825,6 +872,11 @@ export default function Index() {
   };
 
   const handlePickImage = async () => {
+    if (isChildUser) {
+      showChildRestrictedAlert();
+      return;
+    }
+
     try {
       // Request permission
       const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -875,6 +927,11 @@ export default function Index() {
   };
 
   const handleSendMessage = () => {
+    if (isChildUser) {
+      showChildRestrictedAlert();
+      return;
+    }
+
     if (!messageInput.trim() || !activeChat || !user) return;
 
     const newMessage = {
@@ -996,6 +1053,22 @@ export default function Index() {
     </Modal>
   );
 
+  // ==================== LOADING & AGE GATE ====================
+  if (isLoading) {
+    return (
+      <View style={[styles.container, styles.loadingContainer]}>
+        <MaterialCommunityIcons name="school" size={64} color="#2196F3" />
+        <Text variant="titleMedium" style={styles.loadingText}>
+          Loading GrowTogether...
+        </Text>
+      </View>
+    );
+  }
+
+  if (!ageGateComplete) {
+    return <AgeGateScreen onComplete={handleAgeGateComplete} />;
+  }
+
   // ==================== LOGIN SCREEN ====================
   if (currentScreen === 'login' && !user) {
     return (
@@ -1029,7 +1102,7 @@ export default function Index() {
           </Text>
           
           <Text variant="bodySmall" style={styles.infoText}>
-            GrowTogether connects students with volunteer tutors within your school district. Sign in with your Google account to get started!
+            GrowTogether connects students with volunteer tutors in their school district. Create an account or sign in with your username and password.
           </Text>
         </ScrollView>
 
@@ -1229,7 +1302,7 @@ export default function Index() {
             mode="contained"
             onPress={handleQuizSubmit}
             style={styles.submitButton}
-            disabled={!quizData.firstName || !quizData.lastName}
+            disabled={!quizData.firstName || !quizData.lastName || quizData.age === 0}
           >
             Save & Continue
           </Button>
@@ -1480,6 +1553,19 @@ export default function Index() {
         </View>
 
         <ScrollView contentContainerStyle={styles.dashboardContent}>
+          {isChildUser && (
+            <Card style={styles.warningCard}>
+              <Card.Content>
+                <Text variant="titleMedium" style={styles.warningTitle}>
+                  Limited Mode
+                </Text>
+                <Text variant="bodyMedium">
+                  Messaging and photo sharing are turned off. You can browse tutor matches, but ask a parent or guardian for help to start a conversation.
+                </Text>
+              </Card.Content>
+            </Card>
+          )}
+
           <Text variant="titleLarge" style={styles.dashboardSectionTitle}>
             Potential Volunteers
           </Text>
@@ -1540,12 +1626,14 @@ export default function Index() {
                     </View>
                   </Card.Content>
                   <Card.Actions>
-                    <Button 
-                      mode={existingChat ? "outlined" : "contained"} 
-                      onPress={() => handleStartChat(volunteer)}
-                    >
-                      {existingChat ? "Open Chat" : "Start Chat"}
-                    </Button>
+                    {!isChildUser && (
+                      <Button 
+                        mode={existingChat ? "outlined" : "contained"} 
+                        onPress={() => handleStartChat(volunteer)}
+                      >
+                        {existingChat ? "Open Chat" : "Start Chat"}
+                      </Button>
+                    )}
                   </Card.Actions>
                 </Card>
               );
@@ -1854,21 +1942,24 @@ export default function Index() {
 
           <View style={styles.chatInputContainer}>
             <View style={styles.messageInputWrapper}>
-              <IconButton
-                icon="image"
-                size={24}
-                iconColor="#666"
-                onPress={handlePickImage}
-                style={styles.imageButton}
-              />
+              {!isChildUser && (
+                <IconButton
+                  icon="image"
+                  size={24}
+                  iconColor="#666"
+                  onPress={handlePickImage}
+                  style={styles.imageButton}
+                />
+              )}
               <TextInput
                 mode="outlined"
                 value={messageInput}
                 onChangeText={setMessageInput}
-                placeholder="Type a message..."
+                placeholder={isChildUser ? 'Messaging unavailable' : 'Type a message...'}
                 multiline
                 maxLength={500}
                 style={styles.messageInput}
+                editable={!isChildUser}
                 right={
                   <TextInput.Affix 
                     text={`${messageInput.length}/500`}
@@ -1881,7 +1972,7 @@ export default function Index() {
                 size={28}
                 iconColor="#2196F3"
                 onPress={handleSendMessage}
-                disabled={!messageInput.trim()}
+                disabled={!messageInput.trim() || isChildUser}
                 style={styles.sendButton}
               />
             </View>
@@ -1915,7 +2006,19 @@ export default function Index() {
         </View>
 
         <ScrollView>
-          {(!Array.isArray(userChats) || userChats.length === 0) ? (
+          {isChildUser ? (
+            <Card style={styles.emptyCard}>
+              <Card.Content>
+                <MaterialCommunityIcons name="shield-account" size={48} color="#999" style={styles.emptyIcon} />
+                <Text variant="titleMedium" style={styles.emptyTitle}>
+                  Messaging unavailable
+                </Text>
+                <Text variant="bodyMedium" style={styles.emptyText}>
+                  Chat is not available in this mode. Ask a parent or guardian for help using GrowTogether.
+                </Text>
+              </Card.Content>
+            </Card>
+          ) : (!Array.isArray(userChats) || userChats.length === 0) ? (
             <Card style={styles.emptyCard}>
               <Card.Content>
                 <MaterialCommunityIcons name="chat-outline" size={48} color="#999" style={styles.emptyIcon} />
@@ -3300,6 +3403,15 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 40,
     opacity: 0.7,
+  },
+  loadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  loadingText: {
+    marginTop: 16,
+    color: '#666666',
   },
   editProfileModal: {
     flex: 1,
