@@ -319,3 +319,4 @@ Once `inform.growtogether@gmail.com` is set as admin:
 
 You can now create multiple accounts using different Gmail addresses to test the full functionality of the app.
 
+

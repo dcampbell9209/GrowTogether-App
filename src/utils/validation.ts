@@ -86,6 +86,68 @@ export const volunteerSetupSchema = z.object({
     ),
 });
 
+// Volunteer application validation schema
+export const volunteerApplicationSchema = z.object({
+  firstName: z
+    .string()
+    .min(1, 'First name is required')
+    .min(2, 'First name must be at least 2 characters')
+    .max(50, 'First name must be less than 50 characters'),
+
+  lastName: z
+    .string()
+    .min(1, 'Last name is required')
+    .min(2, 'Last name must be at least 2 characters')
+    .max(50, 'Last name must be less than 50 characters'),
+
+  email: z
+    .string()
+    .min(1, 'Email is required')
+    .email('Please enter a valid email address'),
+
+  phone: z
+    .string()
+    .min(1, 'Phone number is required')
+    .regex(/^[\d\s()+-]{10,}$/, 'Please enter a valid phone number'),
+
+  currentGrade: z
+    .string()
+    .min(1, 'Current grade / year is required')
+    .max(30, 'Grade / year must be less than 30 characters'),
+
+  age: z
+    .number()
+    .min(13, 'You must be at least 13 to volunteer')
+    .max(25, 'Age must be less than 25')
+    .int('Age must be a whole number'),
+
+  preferredSubjects: z
+    .string()
+    .min(1, 'Preferred subjects are required')
+    .max(200, 'Preferred subjects must be less than 200 characters'),
+
+  availability: z
+    .object({
+      mon: z.boolean(),
+      tue: z.boolean(),
+      wed: z.boolean(),
+      thu: z.boolean(),
+      fri: z.boolean(),
+      sat: z.boolean(),
+      sun: z.boolean(),
+    })
+    .refine(
+      (availability) => Object.values(availability).some(day => day === true),
+      'Please select at least one day of availability'
+    ),
+
+  motivation: z
+    .string()
+    .min(1, 'Please tell us why you want to volunteer')
+    .min(20, 'Please provide at least 20 characters')
+    .max(1000, 'Response must be less than 1000 characters'),
+});
+
 // Profile update validation schema
 export const profileUpdateSchema = informationQuizSchema.partial();
 
@@ -215,6 +277,7 @@ export const validateField = <T>(
     return 'Invalid value';
   }
 };
+
 
 
 

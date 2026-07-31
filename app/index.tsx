@@ -7,6 +7,7 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AgeGateScreen } from '../src/components/AgeGateScreen';
+import { VolunteerApplicationForm } from '../src/components/forms/VolunteerApplicationForm';
 import {
   AGE_VERIFICATION_STORAGE_KEY,
   AgeVerificationData,
@@ -19,7 +20,7 @@ WebBrowser.maybeCompleteAuthSession();
 const { width } = Dimensions.get('window');
 
 type UserRole = 'student' | 'volunteer';
-type Screen = 'login' | 'quiz' | 'dashboard' | 'chats' | 'volunteerInfo' | 'settings' | 'admin';
+type Screen = 'login' | 'quiz' | 'dashboard' | 'chats' | 'volunteerInfo' | 'volunteerApplication' | 'settings' | 'admin';
 
 interface User {
   email: string;
@@ -1766,6 +1767,14 @@ export default function Index() {
 
   // ==================== VOLUNTEER INFO PAGE ====================
   if (currentScreen === 'volunteerInfo') {
+    const handleOpenWebsite = async () => {
+      try {
+        await WebBrowser.openBrowserAsync('https://growtogetherusa.com');
+      } catch (error) {
+        Alert.alert('Error', 'Could not open the website. Please visit growtogetherusa.com in your browser.');
+      }
+    };
+
     return (
       <>
         {renderZoomModal()}
@@ -1783,22 +1792,67 @@ export default function Index() {
           </Text>
           
           <Text variant="bodyLarge" style={styles.volunteerInfoText}>
-            Visit the GrowTogether Website to apply to become a volunteer tutor and help students in your school district succeed!
+            Apply to become a volunteer tutor and help students in your school district succeed! You can apply on our website or complete the application right here in the app.
           </Text>
 
           <Button
             mode="contained"
             icon="open-in-new"
-            onPress={() => Alert.alert('Opening Browser', 'This would open the GrowTogether website')}
+            onPress={handleOpenWebsite}
             style={styles.volunteerInfoButton}
           >
             Open Website
+          </Button>
+
+          <Button
+            mode="contained-tonal"
+            icon="file-document-edit"
+            onPress={() => setCurrentScreen('volunteerApplication')}
+            style={styles.volunteerInfoButton}
+          >
+            Apply in App
           </Button>
 
           <Button mode="text" onPress={() => setCurrentScreen('dashboard')}>
             Back to Dashboard
           </Button>
         </ScrollView>
+        </View>
+      </>
+    );
+  }
+
+  // ==================== VOLUNTEER APPLICATION PAGE ====================
+  if (currentScreen === 'volunteerApplication') {
+    return (
+      <>
+        {renderZoomModal()}
+        <View style={styles.container}>
+          <View style={styles.header}>
+            <IconButton icon="arrow-left" onPress={() => setCurrentScreen('volunteerInfo')} />
+            <Text variant="headlineMedium">Apply to Volunteer</Text>
+          </View>
+
+          <VolunteerApplicationForm
+            initialData={{
+              firstName: user?.firstName || '',
+              lastName: user?.lastName || '',
+              email: user?.email || '',
+              currentGrade: user?.currentGrade ? `${user.currentGrade}th Grade` : '',
+              age: user?.age || 0,
+              availability: user?.availability || {
+                mon: false,
+                tue: false,
+                wed: false,
+                thu: false,
+                fri: false,
+                sat: false,
+                sun: false,
+              },
+            }}
+            onSuccess={() => setCurrentScreen('dashboard')}
+            onBack={() => setCurrentScreen('volunteerInfo')}
+          />
         </View>
       </>
     );

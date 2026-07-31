@@ -290,3 +290,4 @@ You now have a fully functional tutoring app with:
 
 **Made with ❤️ using React Native, Expo, and React Native Paper**
 
+

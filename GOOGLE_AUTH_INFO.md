@@ -211,3 +211,4 @@ EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID=your-android-client-id.apps.googleuserconte
 
 The current email input modal is just a **development placeholder** to allow testing the rest of the app's functionality without requiring a full OAuth setup. When you implement real Google Sign-In using one of the methods above, it will open the authentic Google authentication flow! 🎉
 
+

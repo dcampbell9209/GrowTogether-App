@@ -189,3 +189,4 @@ Your app now has:
 
 **Complete the Google Cloud and Supabase setup, then test it out!** 🎉
 
+

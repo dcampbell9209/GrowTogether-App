@@ -2,13 +2,13 @@
   "expo": {
     "name": "GrowTogether",
     "slug": "growtogether",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "description": "School district tutoring app that helps students find volunteer tutors and coordinate study support.",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "android": {
       "package": "com.growtogether2024.studentapp",
-      "versionCode": 2,
+      "versionCode": 3,
       "permissions": [
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE",
