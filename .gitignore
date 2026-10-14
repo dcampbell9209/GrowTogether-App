@@ -96,3 +96,8 @@ buck-out/
 # Testing
 coverage/
 
+# Local copies, temp, and nested duplicates
+temp_backup/
+.eas-tmp/
+GrowTogether/
+
